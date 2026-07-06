@@ -5,20 +5,19 @@ ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x10000000;
+    . = 0x00000000;
+    .init :
+    {
+	*(.init)
+    }
     .text :
     {
 	*(.text)
 	*(.text.*)
+    *(.critical)
     }
 
-    . = 0x10030000;
-    .text : 
-    {
-        *(.critical)
-    }
-
-    . = 0x10032000;
+    . = 0x00032000;
     .data :
     {
 	*(.data)
@@ -27,7 +26,7 @@ SECTIONS
 	*(.sdata.*)
     }
 
-    . = 0x1003e600;
+    . = 0x0003e600;
     .bss :
     {
 	*(.bss)
@@ -36,7 +35,7 @@ SECTIONS
 	*(.sbss.*)
     }
 
-    . = 0x100b6d00;
+    . = 0x000b6d00;
     .rodata :
     {
         *(.rodata)

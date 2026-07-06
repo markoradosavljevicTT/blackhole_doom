@@ -694,8 +694,8 @@ void D_DoomMain (void)
 
 		int j;
 #if E1M1ONLY
-#define BAKE_MAPS 4
-		const char * bakemaps[BAKE_MAPS+1] = { "E1M1", "E1M2", "E1M3", "E1M4", 0 };
+#define BAKE_MAPS 3
+		const char * bakemaps[BAKE_MAPS+1] = { "E1M1", "E1M2", "E1M3", 0 };
 #else
 #define BAKE_MAPS 9
 		const char * bakemaps[BAKE_MAPS+1] = { "E1M1", "E1M2", "E1M3", "E1M4", "E1M5", "E1M6", "E1M7", "E1M8", "E1M9", 0 };

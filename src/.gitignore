@@ -1,6 +1,6 @@
-emdoom
-emdoom.bin
-emdoom.gentables.initial
+qsr_doom
+qsr_doom.bin
+qsr_doom.gentables.initial
 support/add_sprites.txt
 support/baked_map_data.c
 support/baked_map_data.o

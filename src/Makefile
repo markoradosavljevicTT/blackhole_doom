@@ -12,7 +12,7 @@ CC_HOST?=gcc
 # 
 
 # for E1M1 Only, 
-#  make clean && cp support/stripchoice-E1M1ONLY.txt support/stripchoice.txt && cp support/stripchoice-E1M1ONLY.txt support/stripchoicebegin.txt && EXTRA_CFLAGS="-DE1M1ONLY=1" make && ls -l emdoom
+#  make clean && cp support/stripchoice-E1M1ONLY.txt support/stripchoice.txt && cp support/stripchoice-E1M1ONLY.txt support/stripchoicebegin.txt && EXTRA_CFLAGS="-DE1M1ONLY=1" make && ls -l qsr_doom
 # 
 
 EXTRA_CFLAGS="-DE1M1ONLY=1"
@@ -21,7 +21,7 @@ CFLAGS?=-m32 -Os -g -w $(IGNORE_WARNINGS) -flto -DMAXPLAYERS=1 -DRANGECHECK -DDI
 LDFLAGS?=-L/usr/X11R6/lib -Wl,--gc-sections $(CFLAGS)
 CFLAGS_HOST?=-std=c17 -m32 $(IGNORE_WARNINGS) $(EXTRA_CFLAGS)
 LDFLAGS_HOST?=-L/usr/X11R6/lib
-CS?=i_video_pajseri.c ../../emu_rv32i/stdlib/*.c
+CS?=i_video_pajseri.c stdlib.c
 
 
 # If you want to reduce printf junk
@@ -36,11 +36,13 @@ CFLAGS+=-DSET_MEMORY_DEBUG=0
 #CFLAGS_HOST+=-fsanitize=address -static-libasan -g
 
 # For RISC-V
-CFLAGS:=-std=c17 -Os -D__STDC_HOSTED__=0 -w $(IGNORE_WARNINGS) -march=rv32im -mabi=ilp32 -nostdlib -ffreestanding -DMAXPLAYERS=1 -DDISABLE_NETWORK -fdata-sections -ffunction-sections $(EXTRA_CFLAGS)
+CFLAGS:=-std=c17 -Os -D__STDC_HOSTED__=0 -w $(IGNORE_WARNINGS) -march=rv32im -mabi=ilp32 -mstrict-align -nostdlib -ffreestanding -DMAXPLAYERS=1 -DDISABLE_NETWORK -fdata-sections -ffunction-sections $(EXTRA_CFLAGS)
 LDFLAGS:= -T linker.ld $(CFLAGS)
 LIBS:=
 SUPPORT_FILES:=startup.S
-CC:=riscv64-elf-gcc
+CC:=/localdev/markoradosavljevic/tt-llk/tests/sfpi/compiler/bin/riscv-tt-elf-gcc
+OBJCOPY:=/localdev/markoradosavljevic/tt-llk/tests/sfpi/compiler/bin/riscv-tt-elf-objcopy
+OBJDUMP:=/localdev/markoradosavljevic/tt-llk/tests/sfpi/compiler/bin/riscv-tt-elf-objdump
 
 # Tricky - if removing maps, also be careful to add/remove maps from stripchoice.txt
 #STRIKEMAP:=-strikemap 3 4 5 6 7 8 9 
@@ -109,21 +111,22 @@ CS+=				\
 		d_net.c			\
 		stubs.c
 
-all:	 emdoom
+all:	 qsr_doom
 
-emdoom:	$(CS) i_main.c $(BAKED) $(SUPPORT_FILES) support/rawwad_use.o
-	$(CC) $(CFLAGS_FINAL)  $^ -o emdoom $(LDFLAGS) $(LIBS)
-	riscv64-elf-objcopy -O binary emdoom emdoom.bin
+qsr_doom:	$(CS) i_main.c $(BAKED) $(SUPPORT_FILES) support/rawwad_use.o
+	$(CC) $(CFLAGS_FINAL)  $^ -o qsr_doom $(LDFLAGS) $(LIBS)
+	$(OBJCOPY) -O binary qsr_doom qsr_doom.bin
+	$(OBJDUMP) -d qsr_doom > qsr_doom.dump
 
-support/baked_texture_data.c support/baked_map_data.c support/bakedoutput.txt : emdoom.gentables.initial
-	./emdoom.gentables.initial $(STRIKEMAP) > support/bakedoutput.txt
+support/baked_texture_data.c support/baked_map_data.c support/bakedoutput.txt : qsr_doom.gentables.initial
+	./qsr_doom.gentables.initial $(STRIKEMAP) > support/bakedoutput.txt
 
 support/add_sprites.txt : support/bakedoutput.txt support/augment_sprites.txt
 	cat support/bakedoutput.txt | grep ADD_SPRITE > support/add_sprites.txt
 	cat support/augment_sprites.txt >> support/add_sprites.txt
 
-#support/baked_map_data.c support/baked_texture_data.c : emdoom.gentables
-#	./emdoom.gentables $(STRIKEMAP)
+#support/baked_map_data.c support/baked_texture_data.c : qsr_doom.gentables
+#	./qsr_doom.gentables $(STRIKEMAP)
 
 support/baked_map_data.o : support/baked_map_data.c
 	$(CC) $(CFLAGS) -c -o $@ $^
@@ -152,20 +155,20 @@ support/rawwad_host_begin.o : support/rawwad_begin.c
 	$(CC_HOST) $(CFLAGS_HOST) -c -o $@ $^
 
 
-emdoom.size : emdoom
-	nm --print-size --size-sort --radix=d emdoom  | grep -v " r " | grep -v " R "
-	size emdoom -A
+qsr_doom.size : qsr_doom
+	nm --print-size --size-sort --radix=d qsr_doom  | grep -v " r " | grep -v " R "
+	size qsr_doom -A
 
-emdoom.gentables : i_main.c $(CS) support/rawwad_host_begin.o $(BAKED)
-	$(CC_HOST) $(CFLAGS_HOST) $(LDFLAGS_HOST) $^ -o emdoom.gentables -g -DGENERATE_BAKED $(LIBS_HOST)
+qsr_doom.gentables : i_main.c $(CS) support/rawwad_host_begin.o $(BAKED)
+	$(CC_HOST) $(CFLAGS_HOST) $(LDFLAGS_HOST) $^ -o qsr_doom.gentables -g -DGENERATE_BAKED $(LIBS_HOST)
 
-emdoom.gentables.initial : i_main.c $(CS) support/rawwad_host_begin.o
-	$(CC_HOST) $(CFLAGS_HOST) $(LDFLAGS_HOST) $^ -o emdoom.gentables.initial -g -DGENERATE_BAKED -DGENERATE_BAKED_INITIAL $(LIBS_HOST)
+qsr_doom.gentables.initial : i_main.c $(CS) support/rawwad_host_begin.o
+	$(CC_HOST) $(CFLAGS_HOST) $(LDFLAGS_HOST) $^ -o qsr_doom.gentables.initial -g -DGENERATE_BAKED -DGENERATE_BAKED_INITIAL $(LIBS_HOST)
 
 
 clean:
 	rm -f *.o *~ *.flc
-	rm -f emdoom emdoom.bin emdoom.gentables emdoom.gentables.initial $(BAKED) support/wadder support/rawwad_host.o support/rawwad_host_use.o support/rawwad_host_begin.o support/shrinkwad
+	rm -f qsr_doom qsr_doom.bin qsr_doom.gentables qsr_doom.gentables.initial $(BAKED) support/wadder support/rawwad_host.o support/rawwad_host_use.o support/rawwad_host_begin.o support/shrinkwad
 	rm -rf support/baked_map_data.c  support/baked_texture_data.c
 	rm -rf support/rawwad_begin.c support/rawwad_begin.o support/rawwad_use.c support/rawwad_use.o support/bakedoutput.txt
 	rm -rf support/add_sprites.txt support/rawwad_begin.h support/rawwad_use.h

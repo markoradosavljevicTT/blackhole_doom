@@ -45,7 +45,7 @@ void I_StartFrame()
 {
 }
 
-#define KEY_ADDR 0x30000000UL
+#define KEY_ADDR 0x1F000UL
 #define ESC 0x80
 #define SPACE 0x40
 #define D 0x20

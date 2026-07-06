@@ -298,7 +298,7 @@ int main( int argc, char ** argv )
 		}
 		else
 		{
-			newtotal += lumpinfo[i].size;
+			newtotal += (lumpinfo[i].size + 3) & ~3;
 			numnewchunks++;
 		}
 	}
@@ -306,16 +306,9 @@ int main( int argc, char ** argv )
 	FILE * f_c = fopen( argv[3], "w" );
 	FILE * f_h = fopen( argv[4], "w" );
 
-	fprintf( f_h, "#ifndef _RAWWAD_H\n"
-	"#define _RAWWAD_H\n"
-	"extern const int numlumps;\n"
-	"extern const unsigned char rawwad[%d];\n"
-	"#endif\n", newtotal );
-	fclose( f_h );
-
 	int tlump = 0;
 	lumpinfo_t        newlumpinfo[numnewchunks+1];
-	unsigned char  * newchunkdata = malloc( newtotal );
+	unsigned char  * newchunkdata = calloc( newtotal, 1 );
 	int marker = 0;
 
 	printf( "Stripping: " );
@@ -342,6 +335,7 @@ int main( int argc, char ** argv )
 			tlump++;
 			memcpy( newchunkdata + marker, &rawwad[lumpinfo[i].position], lumpinfo[i].size );
 			marker += lumpinfo[i].size;
+			marker = (marker + 3) & ~3;
    		}
 	}
 
@@ -363,10 +357,17 @@ int main( int argc, char ** argv )
 
 	printf( "Comparing: %d/%d/%d\n", tlump, numnewchunks, numlumps );
 
+	fprintf( f_h, "#ifndef _RAWWAD_H\n"
+	"#define _RAWWAD_H\n"
+	"extern const int numlumps;\n"
+	"extern const unsigned char rawwad[%d];\n"
+	"#endif\n", marker );
+	fclose( f_h );
+
 	fprintf( f_c, "#include \"../w_wad.h\"\n"
 "const int               numlumps = %d;\n", numnewchunks );
-	fprintf( f_c, "const unsigned char rawwad[%d] = {", newtotal );
-	for( i = 0; i < newtotal; i++ )
+	fprintf( f_c, "const unsigned char rawwad[%d] = {", marker );
+	for( i = 0; i < marker; i++ )
 	{
 		if( i & 0x1f )
 			fprintf( f_c, "0x%02x, ",newchunkdata[i] ); 
