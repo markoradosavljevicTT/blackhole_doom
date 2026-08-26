@@ -19,5 +19,17 @@ sudo apt-get install gcc-multilib gcc-12-multilib libx11-dev:i386 libxext-dev:i3
 ## Building
 
 ```bash
+cd src
 make
+cd ..
+```
+
+## Get ttsim
+```bash
+wget https://github.com/tenstorrent/ttsim/releases/download/v1.10.2/libttsim_qsr.so
+```
+
+## Running
+```bash
+python test_doom_ttsim.py
 ```
