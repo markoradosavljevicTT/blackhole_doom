@@ -36,13 +36,16 @@ CFLAGS+=-DSET_MEMORY_DEBUG=0
 #CFLAGS_HOST+=-fsanitize=address -static-libasan -g
 
 # For RISC-V
-CFLAGS:=-std=c17 -Os -D__STDC_HOSTED__=0 -w $(IGNORE_WARNINGS) -march=rv32im -mabi=ilp32 -mstrict-align -nostdlib -ffreestanding -DMAXPLAYERS=1 -DDISABLE_NETWORK -fdata-sections -ffunction-sections $(EXTRA_CFLAGS)
+CFLAGS:=-std=c17 -Os -D__STDC_HOSTED__=0 -w $(IGNORE_WARNINGS) -mcpu=tt-qsr32-tensix -march=rv32im -mabi=ilp32 -mstrict-align -nostdlib -ffreestanding -DMAXPLAYERS=1 -DDISABLE_NETWORK -fdata-sections -ffunction-sections $(EXTRA_CFLAGS)
 LDFLAGS:= -T linker.ld $(CFLAGS)
 LIBS:=
 SUPPORT_FILES:=startup.S
-CC:=/localdev/markoradosavljevic/tt-llk/tests/sfpi/compiler/bin/riscv-tt-elf-gcc
-OBJCOPY:=/localdev/markoradosavljevic/tt-llk/tests/sfpi/compiler/bin/riscv-tt-elf-objcopy
-OBJDUMP:=/localdev/markoradosavljevic/tt-llk/tests/sfpi/compiler/bin/riscv-tt-elf-objdump
+ifeq ($(strip $(SFPI)),)
+$(error Error: SFPI path is not set export SFPI=...)
+endif
+CC := $(SFPI)/compiler/bin/riscv-tt-elf-gcc
+OBJCOPY := $(SFPI)/compiler/bin/riscv-tt-elf-objcopy
+OBJDUMP := $(SFPI)/compiler/bin/riscv-tt-elf-objdump
 
 # Tricky - if removing maps, also be careful to add/remove maps from stripchoice.txt
 #STRIKEMAP:=-strikemap 3 4 5 6 7 8 9 

@@ -16,8 +16,9 @@ SECTIONS
 	*(.text.*)
     *(.critical)
     }
+    ASSERT(. <= 0x1EF00, "text overflowed into sim page / framebuffer 1")
 
-    . = 0x00032000;
+    . = 0x0003E500;
     .data :
     {
 	*(.data)
@@ -26,7 +27,6 @@ SECTIONS
 	*(.sdata.*)
     }
 
-    . = 0x0003e600;
     .bss :
     {
 	*(.bss)
@@ -35,7 +35,6 @@ SECTIONS
 	*(.sbss.*)
     }
 
-    . = 0x000b6d00;
     .rodata :
     {
         *(.rodata)
@@ -43,6 +42,7 @@ SECTIONS
         *(.srodata)
         *(.srodata.*)
     }
+    ASSERT(. <= 0x3FC000, "rodata overflowed into stack")
 
     . = 0x14000000;
 

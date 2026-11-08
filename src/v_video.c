@@ -218,23 +218,22 @@ void V_DrawPatch(int x, int y, int scrn, patch_t* patch) {
     w = SHORT(patch->width);
 	
 	byte* framebuffer = FRAMEBUFFER;
+	byte* desttop = framebuffer + y * SCREENWIDTH + x;
 
-    for (int scaled_x = x / 2; col < w; scaled_x++, col+=2) {
+    for ( ; col < w; col++, desttop++) {
 
         column = (column_t*)((byte*)patch + LONG(patch->columnofs[col]));
 
         while (column->topdelta != 0xff) {
             source = (byte*)column + 3;
-            int scaled_y = (y + column->topdelta) / 2;
+            byte* dest = desttop + column->topdelta * SCREENWIDTH;
 
-            byte* dest = framebuffer + scaled_y * 160 + scaled_x;
-
-            count = column->length / 2;
+            count = column->length;
 
             while (count--) {
                 *dest = *(LPALETTE + *source);
-                dest += 160;
-				source += 2;
+                dest += SCREENWIDTH;
+                source++;
             }
 
             column = (column_t*)((byte*)column + column->length + 4);

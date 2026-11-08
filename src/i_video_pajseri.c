@@ -5,9 +5,7 @@
 #include "v_video.h"
 #include "i_video_pajseri.h"
 
-#ifndef __riscv
-byte lpalette[256 * 3];
-#endif
+byte lpalette[256];
 
 void I_InitGraphics(void)
 {
@@ -23,11 +21,7 @@ void I_SetPalette(byte *palette)
 		uint8_t b = (palette[i * 3 + 2] & 0xc0);
 		uint8_t g = (palette[i * 3 + 1] & 0xe0) >> 2;
 		uint8_t r = (palette[i * 3 + 0] & 0xe0) >> 5;
-#ifdef __riscv	
-		*(LPALETTE + i) = b | g | r;
-#else
-		lpalette[i] = b | g | r; 
-#endif
+		lpalette[i] = b | g | r;
 	}
 }
 

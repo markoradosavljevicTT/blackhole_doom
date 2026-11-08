@@ -15,11 +15,11 @@ DOOM_ELF = os.path.join(_DIR, "src/qsr_doom")
 TILE_X = 2
 TILE_Y = 2
 
-SCREEN_WIDTH = 160
-SCREEN_HEIGHT = 100
+SCREEN_WIDTH = 320
+SCREEN_HEIGHT = 200
 
-GPU_ADDR1 = 0x00020000
-GPU_ADDR2 = 0x00024000
+GPU_ADDR1 = 0x0001F100
+GPU_ADDR2 = 0x0002EB00
 KB_ADDR = 0x0001F000
 BUFFER_SWITCH_ADDR = 0x0001F004
 
@@ -32,7 +32,7 @@ KB_W = 0x04
 KB_SHIFT = 0x02
 KB_CTRL = 0x01
 
-CLOCKS_PER_POLL = 30000
+CLOCKS_PER_POLL = 100000
 
 DEBUG_REG_BASE = 0x1800000
 SOFT_RESET_0 = DEBUG_REG_BASE + 0xB8
@@ -188,6 +188,8 @@ def poll_keyboard():
                 key_pressed |= KB_ESC
             elif c == 13 or c == 10:
                 key_pressed |= KB_CTRL
+            elif c == ord("e") or c == ord("E"):
+                key_pressed |= KB_SHIFT
             elif c == 3:
                 raise KeyboardInterrupt
     return key_pressed
@@ -196,20 +198,39 @@ def poll_keyboard():
 screen_buffer = bytearray(SCREEN_WIDTH * SCREEN_HEIGHT)
 
 
+_esc_cache = {}
+
+
 def render_framebuffer(fb_data):
-    parts = []
-    parts.append("\033[H")
-    for y in range(SCREEN_HEIGHT):
+    parts = ["\033[H"]
+    cur_fg = cur_bg = None
+    cur_esc = None
+    for y in range(0, SCREEN_HEIGHT, 2):
+        row = []
         for x in range(SCREEN_WIDTH):
-            val = fb_data[y * SCREEN_WIDTH + x]
-            parts.append("\033[38;2;%d;%d;%dm██" % (rgb_r[val], rgb_g[val], rgb_b[val]))
-        parts.append("\033[0m\n")
-    frame = "".join(parts).encode("utf-8")
-    os.write(sys.stdout.fileno(), frame)
+            top = fb_data[y * SCREEN_WIDTH + x]
+            bot = fb_data[(y + 1) * SCREEN_WIDTH + x] if y + 1 < SCREEN_HEIGHT else top
+            fg = (rgb_r[top], rgb_g[top], rgb_b[top])
+            bg = (rgb_r[bot], rgb_g[bot], rgb_b[bot])
+            if fg != cur_fg or bg != cur_bg:
+                key = (fg, bg)
+                esc = _esc_cache.get(key)
+                if esc is None:
+                    esc = "\033[38;2;%d;%d;%d;48;2;%d;%d;%dm" % (fg[0], fg[1], fg[2], bg[0], bg[1], bg[2])
+                    _esc_cache[key] = esc
+                cur_esc = esc
+                cur_fg, cur_bg = fg, bg
+                row.append(cur_esc)
+            row.append("▀")
+        row.append("\033[0m\n")
+        parts.append("".join(row))
+        cur_fg = cur_bg = None
+    os.write(sys.stdout.fileno(), "".join(parts).encode("utf-8"))
 
 
 def run_doom():
     atexit.register(restore_terminal)
+    is_tty = sys.stdout.isatty()
 
     lib = _get_lib()
     lib.libttsim_init()
@@ -237,12 +258,8 @@ def run_doom():
                 read_addr = GPU_ADDR1 if buf_switch else GPU_ADDR2
                 fb_data = tile_read(read_addr, SCREEN_WIDTH * SCREEN_HEIGHT)
 
-                changed = False
-                for i in range(SCREEN_WIDTH * SCREEN_HEIGHT):
-                    if screen_buffer[i] != fb_data[i]:
-                        screen_buffer[i] = fb_data[i]
-                        changed = True
-                if changed:
+                screen_buffer[:] = fb_data
+                if is_tty:
                     render_framebuffer(screen_buffer)
 
             keys = poll_keyboard()
