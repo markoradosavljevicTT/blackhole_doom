@@ -59,7 +59,9 @@ int filelength (int handle)
 // Location of each lump on disk.
 //lumpinfo_t*				lumpinfo;				
 //int						numlumps;
-//void**						lumpcache;
+#ifndef GENERATE_BAKED
+static void*				lumpcache[1024];
+#endif
 
 
 #define strcmpi		strcasecmp
@@ -295,7 +297,11 @@ void W_ReadLump( int lump, void* dest )
 		I_Error ("W_ReadLump: %i >= numlumps",lump);
 
 	l = lumpinfo+lump;
+#ifdef GENERATE_BAKED
 	memcpy( dest, &rawwad[l->position], l->size  );
+#else
+	noc_copy( dest, &rawwad[l->position], l->size );
+#endif
 }
 
 
@@ -318,9 +324,10 @@ W_CacheLumpNum
 	if ((unsigned)lump >= numlumps)
 				I_Error ("W_CacheLumpNum: %i >= numlumps",lump);
 
+#ifdef GENERATE_BAKED
 	return &rawwad[lumpinfo[lump].position];
-
-/*	if (!lumpcache[lump])
+#else
+	if (!lumpcache[lump])
 	{
 		// read the lump in
 		
@@ -334,7 +341,8 @@ W_CacheLumpNum
 				Z_ChangeTag (lumpcache[lump],tag);
 	}
 		
-	return lumpcache[lump];*/
+	return lumpcache[lump];
+#endif
 }
 
 

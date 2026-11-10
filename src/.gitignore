@@ -1,6 +1,6 @@
-qsr_doom
-qsr_doom.bin
-qsr_doom.gentables.initial
+bh_doom
+bh_doom.bin
+bh_doom.gentables.initial
 support/add_sprites.txt
 support/baked_map_data.c
 support/baked_map_data.o

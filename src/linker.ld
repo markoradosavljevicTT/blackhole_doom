@@ -18,6 +18,14 @@ SECTIONS
     }
     ASSERT(. <= 0x1EF00, "text overflowed into sim page / framebuffer 1")
 
+    .noc 0x10000000 :
+    {
+	*(.rodata.rawwad)
+	*(.rodata.tcd_*)
+	*(.rodata.__vertexes*)
+	*(.rodata.__nodes*)
+    }
+
     . = 0x0003E500;
     .data :
     {
@@ -42,7 +50,7 @@ SECTIONS
         *(.srodata)
         *(.srodata.*)
     }
-    ASSERT(. <= 0x3FC000, "rodata overflowed into stack")
+    ASSERT(. <= 0x170000, "rodata overflowed into stack")
 
     . = 0x14000000;
 

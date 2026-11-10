@@ -1,19 +1,24 @@
-#!/usr/bin/env python3
 import atexit
-import ctypes
 import os
 import select
 import struct
 import sys
 import termios
+import time
+
+import tt_umd
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 
-LIBTTSIM_PATH = os.path.join(_DIR, "libttsim_qsr.so")
-DOOM_ELF = os.path.join(_DIR, "src/qsr_doom")
+DOOM_ELF = os.path.join(_DIR, "src/bh_doom")
 
-TILE_X = 2
+TILE_X = 1
 TILE_Y = 2
+
+NOC_BASE = 0x10000000
+NOC_CHUNK = 0x100000
+NOC_L1_ADDR = 0x10000
+NOC_TILES = [(2, 2), (3, 2), (4, 2), (5, 2)]
 
 SCREEN_WIDTH = 320
 SCREEN_HEIGHT = 200
@@ -22,6 +27,7 @@ GPU_ADDR1 = 0x0001F100
 GPU_ADDR2 = 0x0002EB00
 KB_ADDR = 0x0001F000
 BUFFER_SWITCH_ADDR = 0x0001F004
+FRAME_ACK_ADDR = 0x0001F008
 
 KB_ESC = 0x80
 KB_SPACE = 0x40
@@ -32,72 +38,39 @@ KB_W = 0x04
 KB_SHIFT = 0x02
 KB_CTRL = 0x01
 
-CLOCKS_PER_POLL = 100000
+KEY_HOLD = 0.1
 
-DEBUG_REG_BASE = 0x1800000
-SOFT_RESET_0 = DEBUG_REG_BASE + 0xB8
-TRISC0_RESET_PC = DEBUG_REG_BASE + 0x100
-TRISC_RESET_PC_OVERRIDE = DEBUG_REG_BASE + 0x110
-
-BOOTSTRAP_ADDR = 0x3FFFF0
-BOOTSTRAP_CODE = struct.pack("<II", 0x00400137, 0x00000067)
+SOFT_RESET_0 = 0xFFB121B0
+RESET_ALL = 0x47800
+RESET_RUN_BRISC = 0x47000
 
 rgb_r = [((i & 0x07) >> 0) * 36 for i in range(256)]
 rgb_g = [((i & 0x38) >> 3) * 36 for i in range(256)]
 rgb_b = [((i & 0xC0) >> 6) * 85 for i in range(256)]
 
 
-_lib = None
+_dev = None
 
 
-def _get_lib():
-    global _lib
-    if _lib is None:
-        _lib = ctypes.CDLL(LIBTTSIM_PATH)
-        _lib.libttsim_tile_wr_bytes.argtypes = [
-            ctypes.c_uint32,
-            ctypes.c_uint32,
-            ctypes.c_uint64,
-            ctypes.c_void_p,
-            ctypes.c_uint32,
-        ]
-        _lib.libttsim_tile_wr_bytes.restype = None
-        _lib.libttsim_tile_rd_bytes.argtypes = [
-            ctypes.c_uint32,
-            ctypes.c_uint32,
-            ctypes.c_uint64,
-            ctypes.c_void_p,
-            ctypes.c_uint32,
-        ]
-        _lib.libttsim_tile_rd_bytes.restype = None
-        _lib.libttsim_clock.argtypes = [ctypes.c_uint32]
-        _lib.libttsim_clock.restype = None
-    return _lib
+def _get_dev():
+    global _dev
+    if _dev is None:
+        _dev = tt_umd.TTDevice.create(0)
+        _dev.init_tt_device()
+    return _dev
 
 
-def tile_write(addr, data):
-    buf = (ctypes.c_uint8 * len(data))(*data)
-    _get_lib().libttsim_tile_wr_bytes(TILE_X, TILE_Y, addr, buf, len(data))
+def tile_write(addr, data, x=TILE_X, y=TILE_Y):
+    _get_dev().noc_write(x, y, addr, bytes(data))
 
 
 def tile_read(addr, size):
-    buf = (ctypes.c_uint8 * size)()
-    _get_lib().libttsim_tile_rd_bytes(TILE_X, TILE_Y, addr, buf, size)
-    return bytes(buf)
+    return b"".join(_get_dev().noc_read(TILE_X, TILE_Y, addr + off, min(2048, size - off)) for off in range(0, size, 2048))
 
 
-def tile_write32(addr, val):
-    tile_write(addr, struct.pack("<I", val))
-
-
-def advance_clock(n):
-    _get_lib().libttsim_clock(n)
-
-
-def deassert_trisc0(entry_pc):
-    tile_write32(TRISC_RESET_PC_OVERRIDE, 0x1)
-    tile_write32(TRISC0_RESET_PC, entry_pc)
-    tile_write32(SOFT_RESET_0, 0x7000)
+def set_reset(value):
+    for x, y in [(TILE_X, TILE_Y)] + NOC_TILES:
+        _get_dev().noc_write32(x, y, SOFT_RESET_0, value)
 
 
 def parse_elf_segments(path):
@@ -141,9 +114,15 @@ def parse_elf_segments(path):
 def load_elf_to_device(elf_path):
     entry, segments = parse_elf_segments(elf_path)
     for vaddr, data in segments:
-        chunk_size = 4096
-        for off in range(0, len(data), chunk_size):
-            tile_write(vaddr + off, data[off : off + chunk_size])
+        if vaddr >= NOC_BASE:
+            for off in range(0, len(data), NOC_CHUNK):
+                x, y = NOC_TILES[off // NOC_CHUNK]
+                tile_write(NOC_L1_ADDR, data[off : off + NOC_CHUNK], x, y)
+        elif vaddr == 0:
+            tile_write(0, data[:0x10])
+            tile_write(0x20, data[0x20:])
+        else:
+            tile_write(vaddr, data)
     return entry
 
 
@@ -199,10 +178,11 @@ screen_buffer = bytearray(SCREEN_WIDTH * SCREEN_HEIGHT)
 
 
 _esc_cache = {}
+_last_rows = {}
 
 
 def render_framebuffer(fb_data):
-    parts = ["\033[H"]
+    parts = ["\033[?2026h"]
     cur_fg = cur_bg = None
     cur_esc = None
     for y in range(0, SCREEN_HEIGHT, 2):
@@ -222,9 +202,13 @@ def render_framebuffer(fb_data):
                 cur_fg, cur_bg = fg, bg
                 row.append(cur_esc)
             row.append("▀")
-        row.append("\033[0m\n")
-        parts.append("".join(row))
+        row.append("\033[0m")
+        row = "".join(row)
+        if _last_rows.get(y) != row:
+            _last_rows[y] = row
+            parts.append("\033[%d;1H" % (y // 2 + 1) + row)
         cur_fg = cur_bg = None
+    parts.append("\033[?2026l")
     os.write(sys.stdout.fileno(), "".join(parts).encode("utf-8"))
 
 
@@ -232,22 +216,20 @@ def run_doom():
     atexit.register(restore_terminal)
     is_tty = sys.stdout.isatty()
 
-    lib = _get_lib()
-    lib.libttsim_init()
-
+    set_reset(RESET_ALL)
     load_elf_to_device(DOOM_ELF)
-    tile_write(BOOTSTRAP_ADDR, BOOTSTRAP_CODE)
-    deassert_trisc0(BOOTSTRAP_ADDR)
-    advance_clock(1000000)
+    tile_write(BUFFER_SWITCH_ADDR, bytes(8))
+    _get_dev().noc_write32(TILE_X, TILE_Y, SOFT_RESET_0, RESET_RUN_BRISC)
 
     setup_terminal()
 
     prev_switch = 0xFF
     key_pressed = 0
+    key_time = {KB_W: 0.0, KB_S: 0.0, KB_A: 0.0, KB_D: 0.0}
 
     try:
         while True:
-            advance_clock(CLOCKS_PER_POLL)
+            time.sleep(0.005)
 
             buf_switch = tile_read(BUFFER_SWITCH_ADDR, 1)[0]
 
@@ -257,18 +239,25 @@ def run_doom():
 
                 read_addr = GPU_ADDR1 if buf_switch else GPU_ADDR2
                 fb_data = tile_read(read_addr, SCREEN_WIDTH * SCREEN_HEIGHT)
+                tile_write(FRAME_ACK_ADDR, struct.pack("<I", buf_switch))
 
                 screen_buffer[:] = fb_data
                 if is_tty:
                     render_framebuffer(screen_buffer)
 
             keys = poll_keyboard()
+            now = time.time()
+            for bit in key_time:
+                if keys & bit:
+                    key_time[bit] = now
             key_pressed |= keys
-            tile_write(KB_ADDR, bytes([key_pressed]))
+            held = sum(bit for bit in key_time if now - key_time[bit] < KEY_HOLD)
+            tile_write(KB_ADDR, bytes([key_pressed | held]))
 
     except KeyboardInterrupt:
         pass
     finally:
+        set_reset(RESET_ALL)
         restore_terminal()
 
 

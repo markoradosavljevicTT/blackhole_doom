@@ -98,9 +98,9 @@ int  I_GetTime (void)
     newtics = (tp.tv_sec-basetime)*TICRATE + tp.tv_usec*TICRATE/1000000;
     return newtics;
 #else
-    static int basetime = 0;
-    basetime += TICRATE;
-    return basetime / 6; // 6 za normalnu brzinu, 1 za mishu;
+    unsigned lo = *(volatile unsigned*)0xFFB121F0;
+    unsigned hi = *(volatile unsigned*)0xFFB121F8;
+    return ((hi << 22) | (lo >> 10)) / 22321;
 #endif
 }
 

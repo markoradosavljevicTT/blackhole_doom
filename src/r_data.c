@@ -350,10 +350,20 @@ byte* R_GetColumn( int tex, int col )
 	if (lump > 0)
 		return (byte *)W_CacheLumpNum(lump,PU_CACHE)+ofs;
 
+#ifdef GENERATE_BAKED
 	if (!texturecomposite[tex])
 		R_GenerateComposite (tex);
 
 	return texturecomposite[tex] + ofs;
+#else
+	static byte* composite[256];
+	if (!composite[tex])
+	{
+		Z_Malloc (texturecompositesize[tex], PU_CACHE, &composite[tex]);
+		noc_copy (composite[tex], texturecomposite[tex], texturecompositesize[tex]);
+	}
+	return composite[tex] + ofs;
+#endif
 }
 
 

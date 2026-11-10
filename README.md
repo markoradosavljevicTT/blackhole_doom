@@ -1,12 +1,6 @@
-# Doom on Tenstorrent Quasar
+# Doom on Tenstorrent Blackhole
 
-A port of **DOOM** to the **Tenstorrent Quasar** card's TRISC cores. This is not a game, it is a test kernel.
-
-https://github.com/user-attachments/assets/bda750c4-0d4c-4dc9-bb4f-c1085881695f
-
-## Running
-
-Requires the [tt-metal](https://github.com/tenstorrent/tt-metal/tree/marko/doom) Python test to run on ttsim for Quasar.
+A port of **DOOM** to the **Tenstorrent Blackhole** card, running on 4 Tensix cores. This is not a game, it is a test kernel.
 
 ## Dependencies
 
@@ -20,16 +14,12 @@ sudo apt-get install gcc-multilib gcc-12-multilib libx11-dev:i386 libxext-dev:i3
 
 ```bash
 cd src
-make
+SFPI=.../tt-metal/runtime/sfpi make
 cd ..
 ```
 
-## Get ttsim
-```bash
-wget https://github.com/tenstorrent/ttsim/releases/download/v1.10.2/libttsim_qsr.so
-```
-
 ## Running
+Needs `tt_umd` (e.g. tt-metal's python_env):
 ```bash
-python test_doom_ttsim.py
+python test_doom_bh.py
 ```

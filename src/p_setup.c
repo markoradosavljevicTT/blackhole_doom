@@ -159,7 +159,7 @@ void P_LoadSegs (int lump)
 	    li->backsector = 0;
     }
 	
-   // Z_Free (data); Don't free, CacheLumpNum just gives us a pointer to the data.
+   Z_ChangeTag (data, PU_CACHE);
 }
 //
 // P_LoadLineDefs
@@ -239,7 +239,7 @@ void P_LoadLineDefs (int lump)
 	    ld->backsector = 0;
     }
 	
-   // Z_Free (data); Don't free, CacheLumpNum just gives us a pointer to the data.
+   Z_ChangeTag (data, PU_CACHE);
 }
 
 
@@ -271,7 +271,7 @@ void P_LoadSideDefs (int lump)
 	sd->sector = &sectors[SHORT(msd->sector)];
     }
 	
-   // Z_Free (data); Don't free, CacheLumpNum just gives us a pointer to the data.
+   Z_ChangeTag (data, PU_CACHE);
 }
 
 
@@ -299,7 +299,7 @@ void P_LoadSubsectors (int lump)
 	ss->firstline = SHORT(ms->firstseg);
     }
 	
-   // Z_Free (data); Don't free, CacheLumpNum just gives us a pointer to the data.
+   Z_ChangeTag (data, PU_CACHE);
 }
 
 
@@ -333,7 +333,7 @@ void P_LoadSectors (int lump)
 	ss->thinglist = NULL;
     }
 	
-       // Z_Free (data); Don't free, CacheLumpNum just gives us a pointer to the data.
+       Z_ChangeTag (data, PU_CACHE);
 
 }
 
@@ -548,7 +548,7 @@ void P_LoadNodes (int lump)
 	}
     }
 	
-   // Z_Free (data); Don't free, CacheLumpNum just gives us a pointer to the data.
+   Z_ChangeTag (data, PU_CACHE);
 }
 
 
@@ -817,7 +817,8 @@ P_SetupLevel
 	}
 	
 	numvertexes = numvertexes_baked[mapid];
-	vertexes = vertexes_baked[mapid];
+	vertexes = Z_Malloc (numvertexes*sizeof(vertex_t), PU_LEVEL, 0);
+	noc_copy (vertexes, vertexes_baked[mapid], numvertexes*sizeof(vertex_t));
     P_LoadBlockMap (lumpnum+ML_BLOCKMAP);
     P_LoadSectors (lumpnum+ML_SECTORS);
     P_LoadSideDefs (lumpnum+ML_SIDEDEFS);
@@ -825,7 +826,8 @@ P_SetupLevel
     P_LoadSubsectors (lumpnum+ML_SSECTORS);
 //   P_LoadNodes (lumpnum+ML_NODES);
 	numnodes = numnodes_baked[mapid];
-	nodes = nodes_baked[mapid];
+	nodes = Z_Malloc (numnodes*sizeof(node_t), PU_LEVEL, 0);
+	noc_copy (nodes, nodes_baked[mapid], numnodes*sizeof(node_t));
     P_LoadSegs (lumpnum+ML_SEGS);
 	
 

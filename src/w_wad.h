@@ -77,6 +77,7 @@ void    W_ReadLump (int lump, void *dest);
 const void*	W_CacheLumpNum (int lump, int tag);
 void*	W_CacheLumpName (char* name, int tag);
 void*	W_CacheLumpNum_Old (int lump, int tag);
+void	noc_copy (void* dst, const void* src, int len);
 
 
 
