@@ -1,6 +1,7 @@
 import atexit
 import os
 import select
+import signal
 import struct
 import sys
 import termios
@@ -138,7 +139,9 @@ def setup_terminal():
     new[6][termios.VTIME] = 0
     termios.tcsetattr(sys.stdin, termios.TCSANOW, new)
     sys.stdout.write("\033[2J\033[H\033[?25l\033[?1049h")
+    sys.stdout.write("\033[8;%d;%dt" % (SCREEN_HEIGHT // 2, SCREEN_WIDTH))
     sys.stdout.flush()
+    signal.signal(signal.SIGWINCH, lambda *_: _last_rows.clear())
 
 
 def restore_terminal():
@@ -183,6 +186,8 @@ _last_rows = {}
 
 def render_framebuffer(fb_data):
     parts = ["\033[?2026h"]
+    if not _last_rows:
+        parts.append("\033[2J")
     cur_fg = cur_bg = None
     cur_esc = None
     for y in range(0, SCREEN_HEIGHT, 2):
